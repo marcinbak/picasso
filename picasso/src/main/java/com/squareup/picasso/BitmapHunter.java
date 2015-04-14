@@ -15,11 +15,9 @@
  */
 package com.squareup.picasso;
 
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.graphics.BitmapRegionDecoder;
-import android.graphics.Matrix;
+import android.graphics.*;
 import android.net.NetworkInfo;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
@@ -51,7 +49,8 @@ class BitmapHunter implements Runnable {
   private static final Object DECODE_LOCK = new Object();
 
   private static final ThreadLocal<StringBuilder> NAME_BUILDER = new ThreadLocal<StringBuilder>() {
-    @Override protected StringBuilder initialValue() {
+    @Override
+    protected StringBuilder initialValue() {
       return new StringBuilder(Utils.THREAD_PREFIX);
     }
   };
@@ -59,38 +58,40 @@ class BitmapHunter implements Runnable {
   private static final AtomicInteger SEQUENCE_GENERATOR = new AtomicInteger();
 
   private static final RequestHandler ERRORING_HANDLER = new RequestHandler() {
-    @Override public boolean canHandleRequest(Request data) {
+    @Override
+    public boolean canHandleRequest(Request data) {
       return true;
     }
 
-    @Override public Result load(Request request, int networkPolicy) throws IOException {
+    @Override
+    public Result load(Request request, int networkPolicy) throws IOException {
       throw new IllegalStateException("Unrecognized type of request: " + request);
     }
   };
 
-  final int sequence;
-  final Picasso picasso;
+  final int        sequence;
+  final Picasso    picasso;
   final Dispatcher dispatcher;
-  final Cache cache;
-  final Stats stats;
-  final String key;
-  final Request data;
-  final int memoryPolicy;
+  final Cache      cache;
+  final Stats      stats;
+  final String     key;
+  final Request    data;
+  final int        memoryPolicy;
   int networkPolicy;
   final RequestHandler requestHandler;
 
-  Action action;
-  List<Action> actions;
-  Bitmap result;
-  Future<?> future;
+  Action             action;
+  List<Action>       actions;
+  Bitmap             result;
+  Future<?>          future;
   Picasso.LoadedFrom loadedFrom;
-  Exception exception;
-  int exifRotation; // Determined during decoding of original resource.
-  int retryCount;
-  Priority priority;
+  Exception          exception;
+  int                exifRotation; // Determined during decoding of original resource.
+  int                retryCount;
+  Priority           priority;
 
   BitmapHunter(Picasso picasso, Dispatcher dispatcher, Cache cache, Stats stats, Action action,
-      RequestHandler requestHandler) {
+               RequestHandler requestHandler) {
     this.sequence = SEQUENCE_GENERATOR.incrementAndGet();
     this.picasso = picasso;
     this.dispatcher = dispatcher;
@@ -128,12 +129,13 @@ class BitmapHunter implements Runnable {
       byte[] bytes = Utils.toByteArray(stream);
       if (calculateSize) {
         BitmapFactory.decodeByteArray(bytes, 0, bytes.length, options);
-        RequestHandler.calculateInSampleSize(request.targetWidth, request.targetHeight, options,
-            request);
+        if (request.hasSize()) {
+          RequestHandler.calculateInSampleSize(request.targetWidth, request.targetHeight, options,
+              request);
+        }
       }
-      if (request.cropRect != null) {
+      if (request.cropRect != null && validateCrop(options, request.cropRect)) {
         BitmapRegionDecoder bitmapRegionDecoder = BitmapRegionDecoder.newInstance(bytes, 0, bytes.length, false);
-        // TODO check if cropRect fits in bitmap
         Bitmap bitmap = bitmapRegionDecoder.decodeRegion(request.cropRect, options);
         bitmapRegionDecoder.recycle();
         return bitmap;
@@ -143,16 +145,16 @@ class BitmapHunter implements Runnable {
     } else {
       if (calculateSize) {
         BitmapFactory.decodeStream(stream, null, options);
-        RequestHandler.calculateInSampleSize(request.targetWidth, request.targetHeight, options,
-            request);
-
+        if (request.hasSize()) {
+          RequestHandler.calculateInSampleSize(request.targetWidth, request.targetHeight, options,
+              request);
+        }
         markStream.reset(mark);
       }
       final Bitmap bitmap;
 
-      if (request.cropRect != null) {
+      if (request.cropRect != null && validateCrop(options, request.cropRect)) {
         BitmapRegionDecoder bitmapRegionDecoder = BitmapRegionDecoder.newInstance(stream, false);
-        // TODO check if cropRect fits in bitmap
         bitmap = bitmapRegionDecoder.decodeRegion(request.cropRect, options);
         bitmapRegionDecoder.recycle();
       } else {
@@ -167,7 +169,16 @@ class BitmapHunter implements Runnable {
     }
   }
 
-  @Override public void run() {
+  static boolean validateCrop(BitmapFactory.Options options, Rect cropRect) throws IOException {
+    if (cropRect.width() > 0 && cropRect.height() > 0 && cropRect.width() <= options.outWidth && cropRect.height() <= options.outHeight) {
+      return true;
+    } else {
+      throw new IOException("Invalid crop dimensions.");
+    }
+  }
+
+  @Override
+  public void run() {
     try {
       updateThreadName(data);
 
@@ -424,7 +435,7 @@ class BitmapHunter implements Runnable {
   }
 
   static BitmapHunter forRequest(Picasso picasso, Dispatcher dispatcher, Cache cache, Stats stats,
-      Action action) {
+                                 Action action) {
     Request request = action.getRequest();
     List<RequestHandler> requestHandlers = picasso.getRequestHandlers();
 
@@ -448,7 +459,8 @@ class BitmapHunter implements Runnable {
         newResult = transformation.transform(result);
       } catch (final RuntimeException e) {
         Picasso.HANDLER.post(new Runnable() {
-          @Override public void run() {
+          @Override
+          public void run() {
             throw new RuntimeException(
                 "Transformation " + transformation.key() + " crashed with exception.", e);
           }
@@ -467,7 +479,8 @@ class BitmapHunter implements Runnable {
           builder.append(t.key()).append('\n');
         }
         Picasso.HANDLER.post(new Runnable() {
-          @Override public void run() {
+          @Override
+          public void run() {
             throw new NullPointerException(builder.toString());
           }
         });
@@ -476,7 +489,8 @@ class BitmapHunter implements Runnable {
 
       if (newResult == result && result.isRecycled()) {
         Picasso.HANDLER.post(new Runnable() {
-          @Override public void run() {
+          @Override
+          public void run() {
             throw new IllegalStateException("Transformation "
                 + transformation.key()
                 + " returned input Bitmap but recycled it.");
@@ -488,7 +502,8 @@ class BitmapHunter implements Runnable {
       // If the transformation returned a new bitmap ensure they recycled the original.
       if (newResult != result && !result.isRecycled()) {
         Picasso.HANDLER.post(new Runnable() {
-          @Override public void run() {
+          @Override
+          public void run() {
             throw new IllegalStateException("Transformation "
                 + transformation.key()
                 + " mutated input Bitmap but failed to recycle the original.");
@@ -584,7 +599,7 @@ class BitmapHunter implements Runnable {
   }
 
   private static boolean shouldResize(boolean onlyScaleDown, int inWidth, int inHeight,
-      int targetWidth, int targetHeight) {
+                                      int targetWidth, int targetHeight) {
     return !onlyScaleDown || inWidth > targetWidth || inHeight > targetHeight;
   }
 }

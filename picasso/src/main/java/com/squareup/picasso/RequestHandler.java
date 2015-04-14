@@ -129,7 +129,7 @@ public abstract class RequestHandler {
    * {@link Request}, only instantiating them if needed.
    */
   static BitmapFactory.Options createBitmapOptions(Request data) {
-    final boolean justBounds = data.hasSize();
+    final boolean justBounds = data.hasSize() || data.cropRect != null;
     final boolean hasConfig = data.config != null;
     BitmapFactory.Options options = null;
     if (justBounds || hasConfig) {

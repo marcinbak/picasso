@@ -19,6 +19,7 @@ import android.app.Notification;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.widget.ImageView;
@@ -236,6 +237,15 @@ public class RequestCreator {
    */
   public RequestCreator centerInside() {
     data.centerInside();
+    return this;
+  }
+
+  /**
+   * Crops image using provided rectangle dimensions.
+   * @param cropRect - dimensions used for crop
+   */
+  public RequestCreator crop(Rect cropRect) {
+    data.crop(cropRect);
     return this;
   }
 
