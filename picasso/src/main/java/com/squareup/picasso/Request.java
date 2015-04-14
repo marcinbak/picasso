@@ -16,6 +16,7 @@
 package com.squareup.picasso;
 
 import android.graphics.Bitmap;
+import android.graphics.Rect;
 import android.net.Uri;
 import com.squareup.picasso.Picasso.Priority;
 import java.util.ArrayList;
@@ -83,11 +84,23 @@ public final class Request {
   public final Bitmap.Config config;
   /** The priority of this request. */
   public final Priority priority;
+   */
+  public final boolean              hasRotationPivot;
+  /**
+   * Target image config for decoding.
+   */
+  public final Bitmap.Config        config;
+  /**
+   * The priority of this request.
+   */
+  public final Priority             priority;
+
+  public final Rect cropRect;
 
   private Request(Uri uri, int resourceId, String stableKey, List<Transformation> transformations,
-      int targetWidth, int targetHeight, boolean centerCrop, boolean centerInside,
-      boolean onlyScaleDown, float rotationDegrees, float rotationPivotX, float rotationPivotY,
-      boolean hasRotationPivot, Bitmap.Config config, Priority priority) {
+                  int targetWidth, int targetHeight, boolean centerCrop, boolean centerInside,
+                  boolean onlyScaleDown, float rotationDegrees, float rotationPivotX, float rotationPivotY,
+                  boolean hasRotationPivot, Bitmap.Config config, Priority priority, Rect cropRect) {
     this.uri = uri;
     this.resourceId = resourceId;
     this.stableKey = stableKey;
@@ -107,9 +120,11 @@ public final class Request {
     this.hasRotationPivot = hasRotationPivot;
     this.config = config;
     this.priority = priority;
+    this.cropRect = cropRect;
   }
 
-  @Override public String toString() {
+  @Override
+  public String toString() {
     final StringBuilder sb = new StringBuilder("Request{");
     if (resourceId > 0) {
       sb.append(resourceId);
@@ -204,6 +219,7 @@ public final class Request {
     private List<Transformation> transformations;
     private Bitmap.Config config;
     private Priority priority;
+    private Rect                 cropRect;
 
     /** Start building a request using the specified {@link Uri}. */
     public Builder(Uri uri) {
@@ -239,6 +255,7 @@ public final class Request {
       }
       config = request.config;
       priority = request.priority;
+      cropRect = request.cropRect;
     }
 
     boolean hasImage() {
@@ -251,6 +268,10 @@ public final class Request {
 
     boolean hasPriority() {
       return priority != null;
+    }
+
+    boolean hasCropRect() {
+      return cropRect != null;
     }
 
     /**
@@ -416,6 +437,29 @@ public final class Request {
     }
 
     /**
+     * Crops an image. Cropping happens before resizing.
+     */
+    public Builder crop(Rect rect) {
+      if (centerInside) {
+        throw new IllegalStateException("Crop can not be used after calling centerInside");
+      }
+
+      if (centerCrop) {
+        throw new IllegalStateException("Crop can not be used after calling centerCrop");
+      }
+      cropRect = rect;
+      return this;
+    }
+
+    /**
+     * Clear the crop rectangle.
+     */
+    public Builder clearCrop() {
+      cropRect = null;
+      return this;
+    }
+
+    /**
      * Add a custom transformation to be applied to the image.
      * <p>
      * Custom transformations will always be run after the built-in transformations.
@@ -467,7 +511,7 @@ public final class Request {
       }
       return new Request(uri, resourceId, stableKey, transformations, targetWidth, targetHeight,
           centerCrop, centerInside, onlyScaleDown, rotationDegrees, rotationPivotX, rotationPivotY,
-          hasRotationPivot, config, priority);
+          hasRotationPivot, config, priority, cropRect);
     }
   }
 }
