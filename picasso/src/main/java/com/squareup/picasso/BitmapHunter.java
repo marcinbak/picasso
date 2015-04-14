@@ -17,6 +17,7 @@ package com.squareup.picasso;
 
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.BitmapRegionDecoder;
 import android.graphics.Matrix;
 import android.net.NetworkInfo;
 import java.io.IOException;
@@ -130,7 +131,15 @@ class BitmapHunter implements Runnable {
         RequestHandler.calculateInSampleSize(request.targetWidth, request.targetHeight, options,
             request);
       }
-      return BitmapFactory.decodeByteArray(bytes, 0, bytes.length, options);
+      if (request.cropRect != null) {
+        BitmapRegionDecoder bitmapRegionDecoder = BitmapRegionDecoder.newInstance(bytes, 0, bytes.length, false);
+        // TODO check if cropRect fits in bitmap
+        Bitmap bitmap = bitmapRegionDecoder.decodeRegion(request.cropRect, options);
+        bitmapRegionDecoder.recycle();
+        return bitmap;
+      } else {
+        return BitmapFactory.decodeByteArray(bytes, 0, bytes.length, options);
+      }
     } else {
       if (calculateSize) {
         BitmapFactory.decodeStream(stream, null, options);
@@ -139,7 +148,17 @@ class BitmapHunter implements Runnable {
 
         markStream.reset(mark);
       }
-      Bitmap bitmap = BitmapFactory.decodeStream(stream, null, options);
+      final Bitmap bitmap;
+
+      if (request.cropRect != null) {
+        BitmapRegionDecoder bitmapRegionDecoder = BitmapRegionDecoder.newInstance(stream, false);
+        // TODO check if cropRect fits in bitmap
+        bitmap = bitmapRegionDecoder.decodeRegion(request.cropRect, options);
+        bitmapRegionDecoder.recycle();
+      } else {
+        bitmap = BitmapFactory.decodeStream(stream, null, options);
+      }
+
       if (bitmap == null) {
         // Treat null as an IO exception, we will eventually retry.
         throw new IOException("Failed to decode stream.");

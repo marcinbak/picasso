@@ -84,16 +84,6 @@ public final class Request {
   public final Bitmap.Config config;
   /** The priority of this request. */
   public final Priority priority;
-   */
-  public final boolean              hasRotationPivot;
-  /**
-   * Target image config for decoding.
-   */
-  public final Bitmap.Config        config;
-  /**
-   * The priority of this request.
-   */
-  public final Priority             priority;
 
   public final Rect cropRect;
 
